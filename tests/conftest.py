@@ -1,26 +1,15 @@
 """
-High School Management System API
-
-A super simple FastAPI application that allows students to view and sign up
-for extracurricular activities at Mergington High School.
+Pytest configuration and fixtures for Mergington High School API tests
 """
 
-from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
-import os
-from pathlib import Path
+import pytest
+from fastapi.testclient import TestClient
+from copy import deepcopy
+from src.app import app, activities
 
-app = FastAPI(title="Mergington High School API",
-              description="API for viewing and signing up for extracurricular activities")
 
-# Mount the static files directory
-current_dir = Path(__file__).parent
-app.mount("/static", StaticFiles(directory=os.path.join(Path(__file__).parent,
-          "static")), name="static")
-
-# In-memory activity database
-activities = {
+# Store the initial state of activities
+INITIAL_ACTIVITIES = {
     "Chess Club": {
         "description": "Learn strategies and compete in chess tournaments",
         "schedule": "Fridays, 3:30 PM - 5:00 PM",
@@ -78,49 +67,46 @@ activities = {
 }
 
 
-@app.get("/")
-def root():
-    return RedirectResponse(url="/static/index.html")
+@pytest.fixture
+def client():
+    """
+    Provides a FastAPI TestClient instance for making HTTP requests to the API.
+    
+    This fixture creates a test client that can be used to make requests to the
+    application without running a server.
+    """
+    return TestClient(app)
 
 
-@app.get("/activities")
-def get_activities():
-    return activities
+@pytest.fixture(autouse=True)
+def reset_activities():
+    """
+    Resets the activities dictionary to its initial state before each test.
+    
+    This fixture runs automatically before each test (autouse=True) to ensure
+    test isolation by preventing tests from affecting each other through shared state.
+    Uses deepcopy to ensure complete independence of the data structure.
+    """
+    activities.clear()
+    activities.update(deepcopy(INITIAL_ACTIVITIES))
+    yield
+    # Teardown: reset again after the test
+    activities.clear()
+    activities.update(deepcopy(INITIAL_ACTIVITIES))
 
 
-@app.post("/activities/{activity_name}/signup")
-def signup_for_activity(activity_name: str, email: str):
-    """Sign up a student for an activity"""
-    # Validate activity exists
-    if activity_name not in activities:
-        raise HTTPException(status_code=404, detail="Activity not found")
-
-    # Get the specific activity
-    activity = activities[activity_name]
-
-    # Validate student is not already signed up
-    if email in activity["participants"]:
-        raise HTTPException(status_code=400, detail="Student already signed up")
-
-    # Add student
-    activity["participants"].append(email)
-    return {"message": f"Signed up {email} for {activity_name}"}
-
-
-@app.delete("/activities/{activity_name}/participants/{email}")
-def remove_participant(activity_name: str, email: str):
-    """Remove a student from an activity"""
-    # Validate activity exists
-    if activity_name not in activities:
-        raise HTTPException(status_code=404, detail="Activity not found")
-
-    # Get the specific activity
-    activity = activities[activity_name]
-
-    # Validate student is registered
-    if email not in activity["participants"]:
-        raise HTTPException(status_code=404, detail="Student not found in activity")
-
-    # Remove student
-    activity["participants"].remove(email)
-    return {"message": f"Removed {email} from {activity_name}"}
+@pytest.fixture
+def sample_emails():
+    """
+    Provides a list of sample email addresses for testing.
+    
+    Returns:
+        dict: A dictionary with labeled test email addresses
+    """
+    return {
+        "new_student": "newstudent@mergington.edu",
+        "another_student": "anotherstudent@mergington.edu",
+        "test_user": "testuser@example.com",
+        "existing_chess": "michael@mergington.edu",  # Already in Chess Club
+        "existing_programming": "emma@mergington.edu"  # Already in Programming Class
+    }

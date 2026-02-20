@@ -1,5 +1,12 @@
 *.temp*
 
+# Virtual environment #
+###################
+venv/
+env/
+.venv/
+.env/
+
 # Compiled source #
 ###################
 *.com
@@ -38,5 +45,9 @@
 ehthumbs.db
 Thumbs.db
 .actrc*
+
+# Testing files #
+######################
+.pytest_cache/
 
 __pycache__/
